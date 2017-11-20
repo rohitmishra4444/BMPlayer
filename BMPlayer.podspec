@@ -16,7 +16,7 @@ s.social_media_url = 'http://weibo.com/536445669'
 
 s.ios.deployment_target = '8.0'
 s.platform     = :ios, '8.0'
-s.pod_target_xcconfig = { 'SWIFT_VERSION' => '4.0' }
+s.pod_target_xcconfig = { 'SWIFT_VERSION' => '3.2' }
 s.default_subspec = 'Full'
 
 s.subspec 'Core' do |core|
@@ -30,7 +30,7 @@ s.subspec 'Full' do |full|
     full.frameworks   = 'UIKit', 'AVFoundation'
 
     full.dependency 'BMPlayer/Core'
-    full.dependency 'SnapKit', '~> 4.0.0'
+    full.dependency 'SnapKit', '~> 3.2.0'
     full.dependency 'NVActivityIndicatorView', '~> 4.0.0'
 end
 
@@ -40,7 +40,7 @@ s.subspec 'CacheSupport' do |cache|
     cache.frameworks   = 'UIKit', 'AVFoundation'
 
     cache.dependency 'BMPlayer/Core'
-    cache.dependency 'SnapKit', '~> 4.0.0'
+    cache.dependency 'SnapKit', '~> 3.2.0'
     cache.dependency 'NVActivityIndicatorView', '~> 4.0.0'
     cache.dependency 'VIMediaCache'
 end
