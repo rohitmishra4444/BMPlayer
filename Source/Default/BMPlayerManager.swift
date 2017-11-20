@@ -28,6 +28,12 @@ open class BMPlayerManager {
     /// Loader
     open var loaderType  = NVActivityIndicatorType.ballRotateChase
     
+    /// should show back button
+    open var showBackButton = true
+    
+    /// should toggle status bar
+    open var shouldToggleStatusBar = true
+    
     /// should auto play
     open var shouldAutoPlay = true
     
@@ -42,8 +48,6 @@ open class BMPlayerManager {
     open var enableBrightnessGestures = true
     open var enableVolumeGestures = true
     open var enablePlaytimeGestures = true
-    
-    open var enableChooseDefinition = true
     
     internal static func asset(for resouce: BMPlayerResourceDefinition) -> AVURLAsset {
         return AVURLAsset(url: resouce.url, options: resouce.options)

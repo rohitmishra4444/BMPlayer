@@ -49,6 +49,7 @@ open class BMPlayerControlView: UIView {
     
     open weak var delegate: BMPlayerControlViewDelegate?
     open weak var player: BMPlayer?
+    open var didTapOnVideo:(() -> Void)?
     
     // MARK: Variables
     open var resource: BMPlayerResource?
@@ -100,7 +101,7 @@ open class BMPlayerControlView: UIView {
     
     open var subtitleLabel    = UILabel()
     open var subtitleBackView = UIView()
-    open var subtileAttrabute: [NSAttributedStringKey : Any]?
+    open var subtileAttrabute: [String : Any]?
     
     /// Activty Indector for loading
     open var loadingIndector  = NVActivityIndicatorView(frame:  CGRect(x: 0, y: 0, width: 30, height: 30))
@@ -127,6 +128,8 @@ open class BMPlayerControlView: UIView {
         timeSlider.value      = Float(currentTime) / Float(totalTime)
         if let subtitle = resource?.subtitle {
             showSubtile(from: subtitle, at: currentTime)
+        } else {
+            subtitleBackView.isHidden = true
         }
     }
     
@@ -155,6 +158,7 @@ open class BMPlayerControlView: UIView {
             playButton.isSelected = false
             showPlayToTheEndView()
             controlViewAnimation(isShow: true)
+            cancelAutoFadeOutAnimation()
             
         default:
             break
@@ -192,6 +196,9 @@ open class BMPlayerControlView: UIView {
         self.resource = resource
         self.selectedIndex = index
         titleLabel.text = resource.name
+        if !BMPlayerConf.showBackButton{
+            backButton.isHidden = true
+        }
         prepareChooseDefinitionView()
         autoFadeOutControlViewWithAnimation()
     }
@@ -207,9 +214,7 @@ open class BMPlayerControlView: UIView {
     open func autoFadeOutControlViewWithAnimation() {
         cancelAutoFadeOutAnimation()
         delayItem = DispatchWorkItem { [weak self] in
-            if self?.playerLastState != .playedToTheEnd {
-                self?.controlViewAnimation(isShow: false)
-            }
+            self?.controlViewAnimation(isShow: false)
         }
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + BMPlayerConf.animateDelayTimeInterval,
                                       execute: delayItem!)
@@ -231,7 +236,10 @@ open class BMPlayerControlView: UIView {
         let alpha: CGFloat = isShow ? 1.0 : 0.0
         self.isMaskShowing = isShow
         
-        UIApplication.shared.setStatusBarHidden(!isShow, with: .fade)
+        if BMPlayerConf.shouldToggleStatusBar{
+            UIApplication.shared.setStatusBarHidden(!isShow, with: .fade)
+        }
+        
         
         UIView.animate(withDuration: 0.3, animations: {
             self.topMaskView.alpha    = alpha
@@ -263,7 +271,8 @@ open class BMPlayerControlView: UIView {
     open func updateUI(_ isForFullScreen: Bool) {
         isFullscreen = isForFullScreen
         fullscreenButton.isSelected = isForFullScreen
-        chooseDefitionView.isHidden = !BMPlayerConf.enableChooseDefinition || !isForFullScreen
+        chooseDefitionView.isHidden = !isForFullScreen
+        
         if isForFullScreen {
             if BMPlayerConf.topBarShowInCase.rawValue == 2 {
                 topMaskView.isHidden = true
@@ -372,7 +381,7 @@ open class BMPlayerControlView: UIView {
      
      - parameter button: action Button
      */
-    @objc open func onButtonPressed(_ button: UIButton) {
+    open func onButtonPressed(_ button: UIButton) {
         autoFadeOutControlViewWithAnimation()
         if let type = ButtonType(rawValue: button.tag) {
             switch type {
@@ -392,10 +401,11 @@ open class BMPlayerControlView: UIView {
      
      - parameter gesture: tap gesture
      */
-    @objc open func onTapGestureTapped(_ gesture: UITapGestureRecognizer) {
+    open func onTapGestureTapped(_ gesture: UITapGestureRecognizer) {
         if playerLastState == .playedToTheEnd {
             return
         }
+        self.didTapOnVideo?()
         controlViewAnimation(isShow: !isMaskShowing)
     }
     
@@ -623,7 +633,7 @@ open class BMPlayerControlView: UIView {
         
         chooseDefitionView.snp.makeConstraints { (make) in
             make.right.equalTo(topMaskView.snp.right).offset(-20)
-            make.top.equalTo(titleLabel.snp.top).offset(-4)
+            make.top.equalTo(topMaskView.snp.top).offset(20)
             make.width.equalTo(60)
             make.height.equalTo(30)
         }
@@ -717,4 +727,3 @@ open class BMPlayerControlView: UIView {
         return image
     }
 }
-

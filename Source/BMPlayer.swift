@@ -16,7 +16,6 @@ public protocol BMPlayerDelegate : class {
     func bmPlayer(player: BMPlayer ,loadedTimeDidChange loadedDuration: TimeInterval, totalDuration: TimeInterval)
     func bmPlayer(player: BMPlayer ,playTimeDidChange currentTime : TimeInterval, totalTime: TimeInterval)
     func bmPlayer(player: BMPlayer ,playerIsPlaying playing: Bool)
-    func bmPlayer(player: BMPlayer, playerOrientChanged isFullscreen: Bool)
 }
 
 /**
@@ -30,17 +29,20 @@ enum BMPanDirection: Int {
     case vertical   = 1
 }
 
-open class BMPlayer: UIView {
+open class BMPlayer: UIView {    
     
     open weak var delegate: BMPlayerDelegate?
     
     open var backBlock:((Bool) -> Void)?
+    open var didTapFullScreenButton:(() -> Void)?
+    open var didTapOnVideo:(() -> Void)?
+
     
     /// Gesture to change volume / brightness
     open var panGesture: UIPanGestureRecognizer!
     
     /// AVLayerVideoGravityType
-    open var videoGravity = AVLayerVideoGravity.resizeAspect {
+    open var videoGravity = AVLayerVideoGravityResizeAspect {
         didSet {
             self.playerLayer?.videoGravity = videoGravity
         }
@@ -51,6 +53,9 @@ open class BMPlayer: UIView {
             return playerLayer?.isPlaying ?? false
         }
     }
+    
+    
+    open var currentResource: BMPlayerResource?
     
     //Closure fired when play time changed
     open var playTimeDidChange:((TimeInterval, TimeInterval) -> Void)?
@@ -64,7 +69,14 @@ open class BMPlayer: UIView {
     
     open var playerLayer: BMPlayerLayerView?
     
-    fileprivate var resource: BMPlayerResource!
+    /// Adjust the value of Pan to Seek
+    open var panToSeekRate: Double = 1.0
+    
+    fileprivate var resource: BMPlayerResource! {
+        didSet {
+            self.currentResource = resource
+        }
+    }
     
     fileprivate var currentDefinition = 0
     
@@ -102,7 +114,7 @@ open class BMPlayer: UIView {
     fileprivate var isPlayToTheEnd  = false
     //视频画面比例
     fileprivate var aspectRatio:BMPlayerAspectRatio = .default
-    
+      
     //Cache is playing result to improve callback performance
     fileprivate var isPlayingCache: Bool? = nil
     
@@ -117,7 +129,7 @@ open class BMPlayer: UIView {
     open func setVideo(resource: BMPlayerResource, definitionIndex: Int = 0) {
         isURLSet = false
         self.resource = resource
-        
+    
         currentDefinition           = definitionIndex
         controlView.prepareUI(for: resource, selectedIndex: definitionIndex)
         
@@ -154,7 +166,6 @@ open class BMPlayer: UIView {
             isURLSet                = true
         }
         
-        panGesture.isEnabled = true
         playerLayer?.play()
         isPauseByUser = false
     }
@@ -211,6 +222,12 @@ open class BMPlayer: UIView {
         controlView.prepareToDealloc()
     }
     
+    open func forceReloadSubtile() {
+        controlView.playTimeDidChange(currentTime: currentPosition,
+                                      totalTime: totalDuration)
+    }
+    
+    
     /**
      If you want to create BMPlayer with custom control in storyboard.
      create a subclass and override this method.
@@ -224,6 +241,10 @@ open class BMPlayer: UIView {
     // MARK: - Action Response
     
     @objc fileprivate func panDirection(_ pan: UIPanGestureRecognizer) {
+        // 播放结束时，忽略手势
+        guard playerLayer?.state != .playedToTheEnd else {
+            return
+        }
         // 根据在view上Pan的位置，确定是调音量还是亮度
         let locationPoint = pan.location(in: self)
         
@@ -269,21 +290,22 @@ open class BMPlayer: UIView {
             // 比如水平移动结束时，要快进到指定位置，如果这里没有判断，当我们调节音量完之后，会出现屏幕跳动的bug
             switch (self.panDirection) {
             case BMPanDirection.horizontal:
-                controlView.hideSeekToView()
-                isSliderSliding = false
-                if isPlayToTheEnd {
-                    isPlayToTheEnd = false
-                    seek(self.sumTime, completion: {
-                        self.play()
-                    })
-                } else {
-                    seek(self.sumTime, completion: {
-                        self.autoPlay()
-                    })
+                if BMPlayerConf.enablePlaytimeGestures {
+                    controlView.hideSeekToView()
+                    isSliderSliding = false
+                    if isPlayToTheEnd {
+                        isPlayToTheEnd = false
+                        seek(self.sumTime, completion: {
+                            self.play()
+                        })
+                    } else {
+                        seek(self.sumTime, completion: {
+                            self.autoPlay()
+                        })
+                    }
+                    // 把sumTime滞空，不然会越加越多
+                    self.sumTime = 0.0
                 }
-                // 把sumTime滞空，不然会越加越多
-                self.sumTime = 0.0
-                
             case BMPanDirection.vertical:
                 self.isVolume = false
             }
@@ -293,14 +315,23 @@ open class BMPlayer: UIView {
     }
     
     fileprivate func verticalMoved(_ value: CGFloat) {
-        self.isVolume ? (self.volumeViewSlider.value -= Float(value / 10000)) : (UIScreen.main.brightness -= value / 10000)
+        if self.isVolume {
+            if BMPlayerConf.enableVolumeGestures {
+                self.volumeViewSlider.value -= Float(value / 10000)
+            }
+        } else if BMPlayerConf.enableBrightnessGestures {
+            UIScreen.main.brightness -= value / 10000
+        }
     }
     
     fileprivate func horizontalMoved(_ value: CGFloat) {
+        if (!BMPlayerConf.enablePlaytimeGestures) {
+            return
+        }
         isSliderSliding = true
         if let playerItem = playerLayer?.playerItem {
             // 每次滑动需要叠加时间，通过一定的比例，使滑动一直处于统一水平
-            self.sumTime = self.sumTime + TimeInterval(value) / 100.0 * (TimeInterval(self.totalDuration)/400)
+            self.sumTime = self.sumTime + TimeInterval(value) / 100.0 * (TimeInterval(self.totalDuration)/400) * panToSeekRate
             
             let totalTime       = playerItem.duration
             
@@ -315,12 +346,12 @@ open class BMPlayer: UIView {
         }
     }
     
-    @objc open func onOrientationChanged() {
+    @objc fileprivate func onOrientationChanged() {
         self.updateUI(isFullScreen)
-        delegate?.bmPlayer(player: self, playerOrientChanged: isFullScreen)
     }
     
     @objc fileprivate func fullScreenButtonPressed() {
+        self.didTapFullScreenButton?()
         controlView.updateUI(!self.isFullScreen)
         if isFullScreen {
             UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
@@ -343,10 +374,9 @@ open class BMPlayer: UIView {
     
     required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
-        // breaks, should fix if want to have something from storyboard
-        //if let customControlView = classForCoder.storyBoardCustomControl() {
-        //    self.customControlView = customControlView
-        //}
+        if let customControlView = classForCoder.storyBoardCustomControl() {
+            self.customControlView = customControlView
+        }
         initUI()
         initUIData()
         configureVolume()
@@ -379,6 +409,10 @@ open class BMPlayer: UIView {
             controlView = customView
         } else {
             controlView =  BMPlayerControlView()
+        }
+        
+        controlView.didTapOnVideo = {
+            self.didTapOnVideo?()
         }
         
         addSubview(controlView)
@@ -462,7 +496,7 @@ extension BMPlayer: BMPlayerLayerViewDelegate {
         default:
             break
         }
-        panGesture.isEnabled = state != .playedToTheEnd
+
         delegate?.bmPlayer(player: self, playerStateDidChange: state)
     }
     
@@ -484,7 +518,7 @@ extension BMPlayer: BMPlayerLayerViewDelegate {
 }
 
 extension BMPlayer: BMPlayerControlViewDelegate {
-    open func controlView(controlView: BMPlayerControlView,
+    public func controlView(controlView: BMPlayerControlView,
                             didChooseDefition index: Int) {
         shouldSeekTo = currentPosition
         playerLayer?.resetPlayer()
@@ -492,7 +526,7 @@ extension BMPlayer: BMPlayerControlViewDelegate {
         playerLayer?.playAsset(asset: resource.definitions[index].avURLAsset)
     }
     
-    open func controlView(controlView: BMPlayerControlView,
+    public func controlView(controlView: BMPlayerControlView,
                             didPressButton button: UIButton) {
         if let action = BMPlayerControlView.ButtonType(rawValue: button.tag) {
             switch action {
@@ -532,7 +566,7 @@ extension BMPlayer: BMPlayerControlViewDelegate {
         }
     }
     
-    open func controlView(controlView: BMPlayerControlView,
+    public func controlView(controlView: BMPlayerControlView,
                             slider: UISlider,
                             onSliderEvent event: UIControlEvents) {
         switch event {
@@ -560,11 +594,11 @@ extension BMPlayer: BMPlayerControlViewDelegate {
         }
     }
     
-    open func controlView(controlView: BMPlayerControlView, didChangeVideoAspectRatio: BMPlayerAspectRatio) {
+    public func controlView(controlView: BMPlayerControlView, didChangeVideoAspectRatio: BMPlayerAspectRatio) {
         self.playerLayer?.aspectRatio = self.aspectRatio
     }
     
-    open func controlView(controlView: BMPlayerControlView, didChangeVideoPlaybackRate rate: Float) {
+    public func controlView(controlView: BMPlayerControlView, didChangeVideoPlaybackRate rate: Float) {
         self.playerLayer?.player?.rate = rate
     }
 }
