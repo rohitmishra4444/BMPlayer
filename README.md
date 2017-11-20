@@ -10,8 +10,6 @@
 
 A video player for iOS, based on AVPlayer, support the horizontal, vertical screen. support adjust volume, brightness and seek by slide, support subtitles.
 
-[中文说明](https://github.com/BrikerMan/BMPlayer/blob/master/README.zh.md)
-
 ## Features
 - [x] Support for horizontal and vertical play mode
 - [x] Support play online URL and local file
