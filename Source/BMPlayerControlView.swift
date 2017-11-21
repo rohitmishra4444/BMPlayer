@@ -216,8 +216,8 @@ open class BMPlayerControlView: UIView {
         delayItem = DispatchWorkItem { [weak self] in
             self?.controlViewAnimation(isShow: false)
         }
-        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + BMPlayerConf.animateDelayTimeInterval,
-                                      execute: delayItem!)
+//        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + BMPlayerConf.animateDelayTimeInterval,
+//                                      execute: delayItem!)
     }
     
     /**
@@ -240,12 +240,15 @@ open class BMPlayerControlView: UIView {
             UIApplication.shared.setStatusBarHidden(!isShow, with: .fade)
         }
         
-        
+        if playerLastState == .playedToTheEnd {
+            return
+        }
         UIView.animate(withDuration: 0.3, animations: {
             self.topMaskView.alpha    = alpha
             self.bottomMaskView.alpha = alpha
+            self.chooseDefitionView.alpha = alpha
             self.mainMaskView.backgroundColor = UIColor ( red: 0.0, green: 0.0, blue: 0.0, alpha: isShow ? 0.4 : 0.0)
-            
+
             if isShow {
                 if self.isFullscreen { self.chooseDefitionView.alpha = 1.0 }
             } else {
@@ -253,7 +256,7 @@ open class BMPlayerControlView: UIView {
                 self.chooseDefitionView.snp.updateConstraints { (make) in
                     make.height.equalTo(35)
                 }
-                self.chooseDefitionView.alpha = 0.0
+                self.chooseDefitionView.alpha = 1.0
             }
             self.layoutIfNeeded()
         }) { (_) in
@@ -271,7 +274,7 @@ open class BMPlayerControlView: UIView {
     open func updateUI(_ isForFullScreen: Bool) {
         isFullscreen = isForFullScreen
         fullscreenButton.isSelected = isForFullScreen
-        chooseDefitionView.isHidden = !isForFullScreen
+        chooseDefitionView.isHidden = false
         
         if isForFullScreen {
             if BMPlayerConf.topBarShowInCase.rawValue == 2 {
@@ -468,6 +471,7 @@ open class BMPlayerControlView: UIView {
         setupUIComponents()
         addSnapKitConstraint()
         customizeUIComponents()
+        prepareChooseDefinitionView()
     }
     
     required public init?(coder aDecoder: NSCoder) {
@@ -475,6 +479,7 @@ open class BMPlayerControlView: UIView {
         setupUIComponents()
         addSnapKitConstraint()
         customizeUIComponents()
+        prepareChooseDefinitionView()
     }
     
     /// Add Customize functions here

@@ -354,13 +354,18 @@ open class BMPlayer: UIView {
         self.didTapFullScreenButton?()
         controlView.updateUI(!self.isFullScreen)
         if isFullScreen {
-            UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
-            UIApplication.shared.setStatusBarHidden(false, with: .fade)
-            UIApplication.shared.statusBarOrientation = .portrait
+            if BMPlayerConf.shouldToggleStatusBar{
+                UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+                UIApplication.shared.setStatusBarHidden(false, with: .fade)
+                UIApplication.shared.statusBarOrientation = .portrait
+            }
+            
         } else {
-            UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
-            UIApplication.shared.setStatusBarHidden(false, with: .fade)
-            UIApplication.shared.statusBarOrientation = .landscapeRight
+            if BMPlayerConf.shouldToggleStatusBar{
+                UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
+                UIApplication.shared.setStatusBarHidden(true, with: .fade)
+                UIApplication.shared.statusBarOrientation = .landscapeRight
+            }
         }
     }
     
@@ -412,6 +417,7 @@ open class BMPlayer: UIView {
         }
         
         controlView.didTapOnVideo = {
+            print("rohit")
             self.didTapOnVideo?()
         }
         
