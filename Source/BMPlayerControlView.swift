@@ -198,6 +198,8 @@ open class BMPlayerControlView: UIView {
         titleLabel.text = resource.name
         if !BMPlayerConf.showBackButton{
             backButton.isHidden = true
+        }else{
+            backButton.isHidden = false
         }
         prepareChooseDefinitionView()
         autoFadeOutControlViewWithAnimation()
